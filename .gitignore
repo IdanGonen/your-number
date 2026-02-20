@@ -1,0 +1,16 @@
+# Config example (actual config.js is committed since EmailJS keys are public)
+
+# Environment files
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+#MD
+sequential-churning-hearth.md
