@@ -308,188 +308,51 @@ function positionNoButton(btn, container) {
 
 function setupNoButtonEscape(noBtn, yesBtn, container, hint) {
   let isEscaping = false;
-  let swapCount = 0;
 
-  // Very aggressive threshold
+  // Get escape threshold based on screen size
   const getEscapeThreshold = () => {
     const screenWidth = window.innerWidth;
-    if (screenWidth <= 380) return 100;
-    if (screenWidth <= 520) return 120;
-    return 200;
+    if (screenWidth <= 380) return 80;
+    if (screenWidth <= 520) return 100;
+    return 150;
   };
 
-  // THE OL' SWITCHEROO - if they somehow tap No, swap with Yes!
-  function doSwitcheroo() {
-    swapCount++;
-
-    // After 2 swaps, just give them the Yes result
-    if (swapCount >= 2) {
-      state.currentStep = "form";
-      renderStep();
-      return;
-    }
-
-    // Swap button texts and styles
-    const noText = noBtn.textContent;
-    const yesText = yesBtn.textContent;
-
-    noBtn.textContent = yesText;
-    noBtn.classList.remove("btn-no");
-    noBtn.classList.add("btn-yes");
-
-    yesBtn.textContent = noText;
-    yesBtn.classList.remove("btn-yes");
-    yesBtn.classList.add("btn-no");
-
-    // Now clicking the "No" looking button (which is actually yesBtn) goes to form
-    // And clicking the "Yes" looking button (which is actually noBtn) also goes to form!
-
-    // Actually, let's be sneaky - make BOTH buttons go to Yes now
-    setTimeout(() => {
-      state.currentStep = "form";
-      renderStep();
-    }, 100);
-  }
-
-  // MOBILE: Direct touch on button = switcheroo
-  noBtn.addEventListener(
-    "touchstart",
-    (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-
-      // Try to escape first
-      const touch = e.touches[0];
-      if (!isEscaping) {
-        escapeButton(touch.clientX, touch.clientY);
-      }
-    },
-    { capture: true, passive: false },
-  );
-
-  // If touchend fires on button (they completed a tap), do switcheroo
-  noBtn.addEventListener(
-    "touchend",
-    (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      doSwitcheroo();
-    },
-    { capture: true, passive: false },
-  );
-
-  // Block click - if it fires, do switcheroo
-  noBtn.addEventListener(
-    "click",
-    (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      doSwitcheroo();
-    },
-    { capture: true },
-  );
-
-  // Block mousedown (desktop)
-  noBtn.addEventListener("mousedown", (e) => {
-    e.preventDefault();
-    escapeButton(e.clientX, e.clientY);
-  });
-
-  // Mouse movement handler (desktop)
-  function handleMouseMove(e) {
-    if (isEscaping) return;
-
-    const btnRect = noBtn.getBoundingClientRect();
-    const btnCenterX = btnRect.left + btnRect.width / 2;
-    const btnCenterY = btnRect.top + btnRect.height / 2;
-
-    const distance = Math.hypot(e.clientX - btnCenterX, e.clientY - btnCenterY);
-
-    if (distance < getEscapeThreshold()) {
-      escapeButton(e.clientX, e.clientY);
-    }
-  }
-
-  // Touch handler for container - escape on any touch near button
-  function handleTouchStart(e) {
-    if (isEscaping) return;
-
-    const touch = e.touches[0];
-    const btnRect = noBtn.getBoundingClientRect();
-
-    const btnCenterX = btnRect.left + btnRect.width / 2;
-    const btnCenterY = btnRect.top + btnRect.height / 2;
-    const distance = Math.hypot(
-      touch.clientX - btnCenterX,
-      touch.clientY - btnCenterY,
-    );
-
-    if (distance < getEscapeThreshold() * 1.5) {
-      e.preventDefault();
-      escapeButton(touch.clientX, touch.clientY);
-    }
-  }
-
-  // Touch move handler - continuous escape
-  function handleTouchMove(e) {
-    if (isEscaping) return;
-
-    const touch = e.touches[0];
-    const btnRect = noBtn.getBoundingClientRect();
-
-    const btnCenterX = btnRect.left + btnRect.width / 2;
-    const btnCenterY = btnRect.top + btnRect.height / 2;
-    const distance = Math.hypot(
-      touch.clientX - btnCenterX,
-      touch.clientY - btnCenterY,
-    );
-
-    if (distance < getEscapeThreshold() * 1.2) {
-      e.preventDefault();
-      escapeButton(touch.clientX, touch.clientY);
-    }
-  }
-
-  function escapeButton(pointerX, pointerY) {
-    isEscaping = true;
-    state.escapeAttempts++;
-
+  // Calculate best escape position
+  function getEscapePosition(pointerX, pointerY) {
     const containerRect = container.getBoundingClientRect();
     const btnRect = noBtn.getBoundingClientRect();
     const btnWidth = btnRect.width;
     const btnHeight = btnRect.height;
 
-    const padding = 5;
+    const padding = 10;
     const maxX = containerRect.width - btnWidth - padding;
     const maxY = containerRect.height - btnHeight - padding;
 
     const currentX = btnRect.left - containerRect.left;
     const currentY = btnRect.top - containerRect.top;
 
-    // All possible positions
+    // Possible positions (corners and edges)
     const positions = [
       { x: padding, y: padding },
-      { x: maxX / 2, y: padding },
       { x: maxX, y: padding },
+      { x: padding, y: maxY },
+      { x: maxX, y: maxY },
+      { x: maxX / 2, y: padding },
+      { x: maxX / 2, y: maxY },
       { x: padding, y: maxY / 2 },
       { x: maxX, y: maxY / 2 },
-      { x: padding, y: maxY },
-      { x: maxX / 2, y: maxY },
-      { x: maxX, y: maxY },
     ];
 
-    // Filter out current position
+    // Filter positions that are far from current position
     const validPositions = positions.filter((p) => {
-      const dist = Math.hypot(p.x - currentX, p.y - currentY);
-      return dist > 50;
+      return Math.hypot(p.x - currentX, p.y - currentY) > 60;
     });
 
-    // Find furthest from pointer
+    // Find position furthest from pointer
     let bestPosition = validPositions[0] || positions[0];
     let bestDistance = 0;
 
-    for (const pos of validPositions) {
+    for (const pos of validPositions.length ? validPositions : positions) {
       const posCenterX = containerRect.left + pos.x + btnWidth / 2;
       const posCenterY = containerRect.top + pos.y + btnHeight / 2;
       const d = Math.hypot(pointerX - posCenterX, pointerY - posCenterY);
@@ -499,28 +362,113 @@ function setupNoButtonEscape(noBtn, yesBtn, container, hint) {
       }
     }
 
-    const newX = bestPosition.x + (Math.random() - 0.5) * 20;
-    const newY = bestPosition.y + (Math.random() - 0.5) * 20;
+    return {
+      x: Math.max(padding, Math.min(maxX, bestPosition.x)),
+      y: Math.max(padding, Math.min(maxY, bestPosition.y)),
+    };
+  }
+
+  // Move the button away
+  function escapeButton(pointerX, pointerY) {
+    if (isEscaping) return;
+    isEscaping = true;
+    state.escapeAttempts++;
+
+    const pos = getEscapePosition(pointerX, pointerY);
 
     noBtn.classList.add("escaping");
-    noBtn.style.left = `${Math.max(padding, Math.min(maxX, newX))}px`;
-    noBtn.style.top = `${Math.max(padding, Math.min(maxY, newY))}px`;
+    noBtn.style.left = `${pos.x}px`;
+    noBtn.style.top = `${pos.y}px`;
 
-    if (state.escapeAttempts >= 2) {
+    if (state.escapeAttempts >= 3) {
       hint.classList.add("visible");
     }
 
     setTimeout(() => {
       noBtn.classList.remove("escaping");
       isEscaping = false;
-    }, 100);
+    }, 200);
   }
 
-  // Event listeners
-  document.addEventListener("mousemove", handleMouseMove);
-  container.addEventListener("touchstart", handleTouchStart, {
-    passive: false,
+  // Check if point is near the Yes button (don't interfere with Yes)
+  function isNearYesButton(x, y) {
+    const yesRect = yesBtn.getBoundingClientRect();
+    const padding = 20;
+    return (
+      x >= yesRect.left - padding &&
+      x <= yesRect.right + padding &&
+      y >= yesRect.top - padding &&
+      y <= yesRect.bottom + padding
+    );
+  }
+
+  // DESKTOP: Mouse movement triggers escape
+  function handleMouseMove(e) {
+    if (isNearYesButton(e.clientX, e.clientY)) return;
+
+    const btnRect = noBtn.getBoundingClientRect();
+    const btnCenterX = btnRect.left + btnRect.width / 2;
+    const btnCenterY = btnRect.top + btnRect.height / 2;
+    const distance = Math.hypot(e.clientX - btnCenterX, e.clientY - btnCenterY);
+
+    if (distance < getEscapeThreshold()) {
+      escapeButton(e.clientX, e.clientY);
+    }
+  }
+
+  // DESKTOP: Block click on No button
+  noBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    escapeButton(e.clientX, e.clientY);
   });
+
+  // MOBILE: Touch on No button - escape immediately
+  noBtn.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const touch = e.touches[0];
+    escapeButton(touch.clientX, touch.clientY);
+  }, { passive: false });
+
+  // MOBILE: Touch near No button in container
+  function handleTouchStart(e) {
+    const touch = e.touches[0];
+
+    // Don't interfere with Yes button
+    if (isNearYesButton(touch.clientX, touch.clientY)) return;
+
+    const btnRect = noBtn.getBoundingClientRect();
+    const btnCenterX = btnRect.left + btnRect.width / 2;
+    const btnCenterY = btnRect.top + btnRect.height / 2;
+    const distance = Math.hypot(touch.clientX - btnCenterX, touch.clientY - btnCenterY);
+
+    if (distance < getEscapeThreshold()) {
+      e.preventDefault();
+      escapeButton(touch.clientX, touch.clientY);
+    }
+  }
+
+  // MOBILE: Touch move near No button
+  function handleTouchMove(e) {
+    const touch = e.touches[0];
+
+    if (isNearYesButton(touch.clientX, touch.clientY)) return;
+
+    const btnRect = noBtn.getBoundingClientRect();
+    const btnCenterX = btnRect.left + btnRect.width / 2;
+    const btnCenterY = btnRect.top + btnRect.height / 2;
+    const distance = Math.hypot(touch.clientX - btnCenterX, touch.clientY - btnCenterY);
+
+    if (distance < getEscapeThreshold()) {
+      e.preventDefault();
+      escapeButton(touch.clientX, touch.clientY);
+    }
+  }
+
+  // Add listeners
+  document.addEventListener("mousemove", handleMouseMove);
+  container.addEventListener("touchstart", handleTouchStart, { passive: false });
   container.addEventListener("touchmove", handleTouchMove, { passive: false });
 
   return () => {
